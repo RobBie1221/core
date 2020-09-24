@@ -67,7 +67,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the DSMR sensor."""
     # Suppress logging
-    logging.getLogger("dsmr_parser").setLevel(logging.ERROR)
+    logging.getLogger("dsmr_parser").setLevel(logging.DEBUG)
 
     config = entry.data
 
