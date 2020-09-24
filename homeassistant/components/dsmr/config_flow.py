@@ -89,9 +89,12 @@ class DSMRConnection:
 
 async def _validate_dsmr_connection(hass: core.HomeAssistant, data):
     """Validate the user input allows us to connect."""
+    _LOGGER.debug("Start validation connection to DSMR")
+    
     conn = DSMRConnection(data.get(CONF_HOST), data[CONF_PORT], data[CONF_DSMR_VERSION])
 
     if not await conn.validate_connect(hass):
+        _LOGGER.debug("Cannot connect to DSMR")
         raise CannotConnect
 
     equipment_identifier = conn.equipment_identifier()
@@ -99,6 +102,7 @@ async def _validate_dsmr_connection(hass: core.HomeAssistant, data):
 
     # Check only for equipment identifier in case no gas meter is connected
     if equipment_identifier is None:
+        _LOGGER.debug("Unable to retrieve equipment identifier")
         raise CannotCommunicate
 
     info = {
