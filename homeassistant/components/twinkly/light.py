@@ -8,11 +8,18 @@ from aiohttp import ClientError
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
+    ATTR_HS_COLOR,
+    ATTR_RGB_COLOR,
+    ATTR_WHITE_VALUE,
+    ATTR_XY_COLOR,
     SUPPORT_BRIGHTNESS,
+    SUPPORT_COLOR,
+    SUPPORT_WHITE_VALUE,
     LightEntity,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.typing import HomeAssistantType
+import homeassistant.util.color as color_util
 
 from .const import (
     ATTR_HOST,
@@ -51,6 +58,9 @@ class TwinklyLight(LightEntity):
         self._id = conf.data[CONF_ENTRY_ID]
         self._hass = hass
         self._conf = conf
+        self._hs = None
+        self._white = 0
+        self._rgb = None
 
         # Those are saved in the config entry in order to have meaningful values even
         # if the device is currently offline.
@@ -71,7 +81,7 @@ class TwinklyLight(LightEntity):
     @property
     def supported_features(self):
         """Get the features supported by this entity."""
-        return SUPPORT_BRIGHTNESS
+        return SUPPORT_BRIGHTNESS | SUPPORT_COLOR | SUPPORT_WHITE_VALUE
 
     @property
     def should_poll(self) -> bool:
@@ -128,6 +138,16 @@ class TwinklyLight(LightEntity):
         return self._brightness
 
     @property
+    def hs_color(self):
+        """Return the hs color."""
+        return self._hs
+
+    @property
+    def white_value(self):
+        """Return the white value of this light between 0..255."""
+        return self._white
+
+    @property
     def state_attributes(self) -> dict:
         """Return device specific state attributes."""
 
@@ -136,6 +156,14 @@ class TwinklyLight(LightEntity):
         # Make sure to update any normalized property
         attributes[ATTR_HOST] = self._client.host
         attributes[ATTR_BRIGHTNESS] = self._brightness
+
+        if self.hs_color:
+            hs_color = self.hs_color
+            attributes[ATTR_HS_COLOR] = (round(hs_color[0], 3), round(hs_color[1], 3))
+            attributes[ATTR_RGB_COLOR] = color_util.color_hs_to_RGB(*hs_color)
+            attributes[ATTR_XY_COLOR] = color_util.color_hs_to_xy(*hs_color)
+
+        attributes[ATTR_WHITE_VALUE] = self.white_value
 
         return attributes
 
@@ -152,7 +180,50 @@ class TwinklyLight(LightEntity):
 
             await self._client.set_brightness(brightness)
 
-        await self._client.set_is_on(True)
+        rgbw = None
+
+        if ATTR_WHITE_VALUE in kwargs:
+            white = kwargs[ATTR_WHITE_VALUE]
+        elif ATTR_HS_COLOR in kwargs:
+            self._hs = kwargs[ATTR_HS_COLOR]
+            if ATTR_WHITE_VALUE not in kwargs:
+                white = self._white
+
+        if (
+            ATTR_WHITE_VALUE in kwargs or ATTR_HS_COLOR in kwargs
+        ) and self._hs is not None:
+            rgbw = "#"
+            for colorval in color_util.color_hs_to_RGB(*self._hs):
+                rgbw += format(colorval, "02x")
+
+            r = int(rgbw[1:3], 16)
+            g = int(rgbw[3:5], 16)
+            b = int(rgbw[5:7], 16)
+
+            if r == 255 and g == 255 and b == 255:
+                r = 0
+                g = 0
+                b = 0
+
+                if ATTR_HS_COLOR in kwargs:
+                    if self._white == 0:
+                        white = 255
+                    else:
+                        white = self._white
+            elif ATTR_WHITE_VALUE not in kwargs:
+                # white LED must be off in order for color to work
+                if self._rgb == (0, 0, 0) and (r, g, b) != (0, 0, 0):
+                    white = 0
+
+            self._white = white
+            self._rgb = (r, g, b)
+
+            w = self._white
+
+            await self._client.set_static_colour((w, r, g, b))
+
+        if not kwargs:
+            await self._client.set_is_on(True)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn device off."""
