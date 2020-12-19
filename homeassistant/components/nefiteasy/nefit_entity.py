@@ -7,7 +7,7 @@ from typing import Callable, List
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_NAME, DISPATCHER_ON_DEVICE_UPDATE, STATE_CONNECTION_VERIFIED
+from .const import DISPATCHER_ON_DEVICE_UPDATE, STATE_CONNECTION_VERIFIED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class NefitEntity(Entity):
         self._remove_callbacks = []
 
         del self._client.events[self._key]
-        del self._client.uiStatusVars[self._key]
+        del self._client.ui_status_vars[self._key]
 
     async def async_update(self):
         """Request latest data."""
@@ -76,7 +76,7 @@ class NefitEntity(Entity):
     @property
     def name(self):
         """Return the name of the device."""
-        return "{} {}".format(self._config[CONF_NAME], self._typeconf["name"])
+        return "{} {}".format("Nefit", self._typeconf["name"])
 
     @property
     def unique_id(self) -> str:

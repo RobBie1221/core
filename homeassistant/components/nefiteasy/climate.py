@@ -18,7 +18,6 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .const import (
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
-    CONF_NAME,
     CONF_TEMP_STEP,
     DISPATCHER_ON_DEVICE_UPDATE,
     DOMAIN,
@@ -114,7 +113,7 @@ class NefitThermostat(ClimateEntity):
     @property
     def name(self):
         """Return the name of the ClimateEntity."""
-        return self._config.get(CONF_NAME)
+        return "Nefit"
 
     @property
     def unique_id(self) -> str:

@@ -21,5 +21,5 @@ class NefitEasyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         return self.async_create_entry(
-            title=f"Nefit {import_config[CONF_SERIAL]}", data=import_config
+            title=f"{import_config[CONF_SERIAL]}", data=import_config
         )

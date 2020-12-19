@@ -83,12 +83,12 @@ async def async_setup(hass, config):
 
     for device_conf in conf[CONF_DEVICES]:
         data = {
-            CONF_SERIAL: conf[CONF_SERIAL],
-            CONF_ACCESSKEY: conf[CONF_ACCESSKEY],
-            CONF_PASSWORD: conf[CONF_PASSWORD],
-            CONF_MIN_TEMP: conf[CONF_MIN_TEMP],
-            CONF_MAX_TEMP: conf[CONF_MAX_TEMP],
-            CONF_TEMP_STEP: conf[CONF_TEMP_STEP],
+            CONF_SERIAL: device_conf[CONF_SERIAL],
+            CONF_ACCESSKEY: device_conf[CONF_ACCESSKEY],
+            CONF_PASSWORD: device_conf[CONF_PASSWORD],
+            CONF_MIN_TEMP: device_conf[CONF_MIN_TEMP],
+            CONF_MAX_TEMP: device_conf[CONF_MAX_TEMP],
+            CONF_TEMP_STEP: device_conf[CONF_TEMP_STEP],
         }
 
         hass.async_create_task(
@@ -105,6 +105,8 @@ async def async_setup(hass, config):
 async def async_setup_entry(hass, entry: config_entries.ConfigEntry):
     """Set up the nefiteasy component."""
     hass.data.setdefault(DOMAIN, {})
+
+    hass.data[DOMAIN][entry.entry_id] = {}
 
     credentials = dict(entry.data)
     client = NefitEasy(hass, credentials)
