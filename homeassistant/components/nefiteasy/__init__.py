@@ -6,10 +6,11 @@ import logging
 from aionefit import NefitCore
 import voluptuous as vol
 
+from homeassistant import config_entries
+
 # from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.discovery import async_load_platform
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import (
@@ -66,37 +67,62 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+DOMAINS = ["climate", "sensor", "switch"]
+
 
 async def async_setup(hass, config):
     """Set up the nefiteasy component."""
-    _LOGGER.debug("Starting setup")
-    nefit_data = hass.data[DOMAIN] = {}
-    nefit_data["devices"] = []
+    if DOMAIN not in config:
+        return True
 
-    conf = config.get(DOMAIN)
+    conf = config[DOMAIN]
 
     if CONF_DEVICES not in conf:
         return True
 
     for device_conf in conf[CONF_DEVICES]:
-        credentials = dict(device_conf)
-        client = NefitEasy(hass, credentials)
+        data = {
+            CONF_SERIAL: conf[CONF_SERIAL],
+            CONF_ACCESSKEY: conf[CONF_ACCESSKEY],
+            CONF_PASSWORD: conf[CONF_PASSWORD],
+            CONF_MIN_TEMP: conf[CONF_MIN_TEMP],
+            CONF_MAX_TEMP: conf[CONF_MAX_TEMP],
+            CONF_TEMP_STEP: conf[CONF_TEMP_STEP],
+        }
 
-        await client.connect()
-        _LOGGER.debug("Is connected state? %s", client.connected_state)
-
-        if client.connected_state == STATE_CONNECTION_VERIFIED:
-            nefit_data["devices"].append({"client": client, "config": device_conf})
-            _LOGGER.info(
-                "Successfully connected %s to Nefit device!",
-                credentials.get(CONF_SERIAL),
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": config_entries.SOURCE_IMPORT},
+                data=data,
             )
+        )
 
-        if len(nefit_data["devices"]) > 0:
-            for platform in ["climate", "sensor", "switch"]:
-                hass.async_create_task(
-                    async_load_platform(hass, platform, DOMAIN, {}, device_conf)
-                )
+    return True
+
+
+async def async_setup_entry(hass, entry: config_entries.ConfigEntry):
+    """Set up the nefiteasy component."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN].setdefault("devices", [])
+
+    credentials = dict(entry.data)
+    client = NefitEasy(hass, credentials)
+
+    await client.connect()
+    _LOGGER.debug("Is connected state? %s", client.connected_state)
+
+    if client.connected_state == STATE_CONNECTION_VERIFIED:
+        hass.data[DOMAIN]["devices"].append({"client": client, "config": entry.data})
+        _LOGGER.info(
+            "Successfully connected %s to Nefit device!",
+            credentials.get(CONF_SERIAL),
+        )
+
+    for domain in DOMAINS:
+        hass.async_create_task(
+            hass.config_entries.async_forward_entry_setup(entry, domain)
+        )
 
     return True
 

@@ -31,7 +31,7 @@ class NefitEntity(Entity):
             self._client.keys[self._url] = key
 
         if "short" in typeconf:
-            self._client.uiStatusVars[key] = typeconf["short"]
+            self._client.ui_status_vars[key] = typeconf["short"]
 
         self._remove_callbacks: List[Callable[[], None]] = []
 
