@@ -196,6 +196,9 @@ aiolifx==0.6.7
 # homeassistant.components.lifx
 aiolifx_effects==0.2.2
 
+# homeassistant.components.nefiteasy
+aionefit==0.14
+
 # homeassistant.components.keyboard_remote
 aionotify==0.2.0
 
