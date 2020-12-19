@@ -34,23 +34,24 @@ OPERATION_MANUAL = "Manual"
 OPERATION_CLOCK = "Clock"
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_entry(hass, config_entry, async_add_entities):
     """Climate setup for nefit easy."""
     entities = []
-    for device in hass.data[DOMAIN]["devices"]:
-        entities.append(NefitThermostat(device))
+
+    client = hass.data[DOMAIN][config_entry.entry_id]["client"]
+
+    entities.append(NefitThermostat(client, config_entry.data))
 
     async_add_entities(entities, update_before_add=True)
-    _LOGGER.debug("climate: async_setup_platform done")
 
 
 class NefitThermostat(ClimateEntity):
     """Representation of a NefitThermostat device."""
 
-    def __init__(self, device):
+    def __init__(self, client, data):
         """Initialize the thermostat."""
-        self._client = device["client"]
-        self._config = device["config"]
+        self._client = client
+        self._config = data
         self._key = "uistatus"
         self._url = "/ecus/rrc/uiStatus"
         self._unique_id = "{}_{}".format(self._client.nefit.serial_number, "climate")

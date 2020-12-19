@@ -15,10 +15,10 @@ _LOGGER = logging.getLogger(__name__)
 class NefitEntity(Entity):
     """Representation of a Nefit entity."""
 
-    def __init__(self, device, key, typeconf):
+    def __init__(self, client, data, key, typeconf):
         """Initialize the sensor."""
-        self._client = device["client"]
-        self._config = device["config"]
+        self._client = client
+        self._config = data
         self._typeconf = typeconf
         self._key = key
         self._unique_id = f"{self._client.nefit.serial_number}_{self._key}"

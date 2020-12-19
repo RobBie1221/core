@@ -4,53 +4,55 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 
-from .const import CONF_SWITCHES, DOMAIN, SWITCH_TYPES
+from .const import DOMAIN, SWITCH_TYPES
 from .nefit_entity import NefitEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_entry(hass, config_entry, async_add_entities):
     """Switch setup for nefit easy."""
     entities = []
-    for device in hass.data[DOMAIN]["devices"]:
-        config = device["config"]
 
-        for key in config[CONF_SWITCHES]:
-            typeconf = SWITCH_TYPES[key]
-            if key == "hot_water":
-                entities.append(NefitHotWater(device, key, typeconf))
-            elif key == "lockui":
-                entities.append(NefitSwitchTrueFalse(device, key, typeconf))
-            elif key == "weather_dependent":
-                entities.append(NefitWeatherDependent(device, key, typeconf))
-            elif key == "home_entrance_detection":
-                await setup_home_entrance_detection(entities, device, key, typeconf)
-            else:
-                entities.append(NefitSwitch(device, key, typeconf))
+    client = hass.data[DOMAIN][config_entry.entry_id]["client"]
+
+    for key in list(SWITCH_TYPES):
+        typeconf = SWITCH_TYPES[key]
+        if key == "hot_water":
+            entities.append(NefitHotWater(client, config_entry.data, key, typeconf))
+        elif key == "lockui":
+            entities.append(
+                NefitSwitchTrueFalse(client, config_entry.data, key, typeconf)
+            )
+        elif key == "weather_dependent":
+            entities.append(
+                NefitWeatherDependent(client, config_entry.data, key, typeconf)
+            )
+        elif key == "home_entrance_detection":
+            await setup_home_entrance_detection(
+                entities, client, config_entry.data, key, typeconf
+            )
+        else:
+            entities.append(NefitSwitch(client, config_entry.data, key, typeconf))
 
     async_add_entities(entities, True)
 
-    _LOGGER.debug("switch: async_setup_platform done")
 
-
-async def setup_home_entrance_detection(entities, device, basekey, basetypeconf):
+async def setup_home_entrance_detection(entities, client, data, basekey, basetypeconf):
     """Home entrance detection setup."""
     for i in range(0, 10):
         userprofile_id = f"userprofile{i}"
         endpoint = f"/ecus/rrc/homeentrancedetection/{userprofile_id}/"
-        is_active = await device["client"].get_value(
-            userprofile_id, endpoint + "active"
-        )
+        is_active = await client.get_value(userprofile_id, endpoint + "active")
         _LOGGER.debug("hed switch: is_active: %s", is_active)
         if is_active == "on":
-            name = await device["client"].get_value(userprofile_id, endpoint + "name")
+            name = await client.get_value(userprofile_id, endpoint + "name")
             typeconf = {}
             typeconf["name"] = basetypeconf["name"].format(name)
             typeconf["url"] = endpoint + "detected"
             typeconf["icon"] = basetypeconf["icon"]
             entities.append(
-                NefitSwitch(device, f"{basekey}_{userprofile_id}", typeconf)
+                NefitSwitch(client, data, f"{basekey}_{userprofile_id}", typeconf)
             )
 
 
@@ -87,9 +89,9 @@ class NefitSwitch(NefitEntity, SwitchEntity):
 class NefitHotWater(NefitSwitch):
     """Class for nefit hot water entity."""
 
-    def __init__(self, device, key, typeconf):
+    def __init__(self, client, data, key, typeconf):
         """Initialize the switch."""
-        super().__init__(device, key, typeconf)
+        super().__init__(client, data, key, typeconf)
 
         self._client.keys["/dhwCircuits/dhwA/dhwOperationClockMode"] = self._key
         self._client.keys["/dhwCircuits/dhwA/dhwOperationManualMode"] = self._key
