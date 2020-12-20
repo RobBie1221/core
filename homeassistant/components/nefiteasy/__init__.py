@@ -82,20 +82,11 @@ async def async_setup(hass, config):
         return True
 
     for device_conf in conf[CONF_DEVICES]:
-        data = {
-            CONF_SERIAL: device_conf[CONF_SERIAL],
-            CONF_ACCESSKEY: device_conf[CONF_ACCESSKEY],
-            CONF_PASSWORD: device_conf[CONF_PASSWORD],
-            CONF_MIN_TEMP: device_conf[CONF_MIN_TEMP],
-            CONF_MAX_TEMP: device_conf[CONF_MAX_TEMP],
-            CONF_TEMP_STEP: device_conf[CONF_TEMP_STEP],
-        }
-
         hass.async_create_task(
             hass.config_entries.flow.async_init(
                 DOMAIN,
                 context={"source": config_entries.SOURCE_IMPORT},
-                data=data,
+                data=device_conf,
             )
         )
 

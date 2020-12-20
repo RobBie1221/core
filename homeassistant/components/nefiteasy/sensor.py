@@ -2,7 +2,7 @@
 
 import logging
 
-from .const import DOMAIN, SENSOR_TYPES
+from .const import CONF_SENSORS, DOMAIN, SENSOR_TYPES
 from .nefit_entity import NefitEntity
 
 # from homeassistant.core import callback
@@ -16,15 +16,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     entities = []
 
     client = hass.data[DOMAIN][config_entry.entry_id]["client"]
+    data = config_entry.data
 
-    for key in list(SENSOR_TYPES):
+    for key in data[CONF_SENSORS]:
         typeconf = SENSOR_TYPES[key]
         if key == "status":
-            entities.append(NefitStatus(client, config_entry.data, key, typeconf))
+            entities.append(NefitStatus(client, data, key, typeconf))
         elif key == "year_total":
-            entities.append(NefitYearTotal(client, config_entry.data, key, typeconf))
+            entities.append(NefitYearTotal(client, data, key, typeconf))
         else:
-            entities.append(NefitSensor(client, config_entry.data, key, typeconf))
+            entities.append(NefitSensor(client, data, key, typeconf))
 
     async_add_entities(entities, True)
 
