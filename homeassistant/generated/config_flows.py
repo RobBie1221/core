@@ -129,6 +129,7 @@ FLOWS = [
     "mqtt",
     "myq",
     "neato",
+    "nefiteasy",
     "nest",
     "netatmo",
     "nexia",
