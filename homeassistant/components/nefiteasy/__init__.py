@@ -122,6 +122,27 @@ async def async_setup_entry(hass, entry: config_entries.ConfigEntry):
     return True
 
 
+async def async_unload_entry(hass, entry: config_entries.ConfigEntry):
+    """Unload nefit easy component."""
+    if not all(
+        await asyncio.gather(
+            *[
+                hass.config_entries.async_forward_entry_unload(entry, component)
+                for component in DOMAINS
+            ]
+        )
+    ):
+        return False
+
+    client = hass.data[DOMAIN][entry.entry_id]["client"]
+
+    await client.shutdown()
+
+    hass.data[DOMAIN].pop(entry.entry_id)
+
+    return True
+
+
 class NefitEasy:
     """Supporting class for nefit easy."""
 
