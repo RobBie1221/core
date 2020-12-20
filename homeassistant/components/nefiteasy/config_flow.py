@@ -10,6 +10,7 @@ from .const import (  # pylint:disable=unused-import
     CONF_ACCESSKEY,
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
+    CONF_NAME,
     CONF_PASSWORD,
     CONF_SENSORS,
     CONF_SERIAL,
@@ -72,6 +73,7 @@ class NefitEasyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_MIN_TEMP: user_input[CONF_MIN_TEMP],
                 CONF_MAX_TEMP: user_input[CONF_MAX_TEMP],
                 CONF_TEMP_STEP: user_input[CONF_TEMP_STEP],
+                CONF_NAME: "Nefit",
             }
 
             return self.async_create_entry(title=f"{self._serial}", data=data)
