@@ -55,7 +55,8 @@ class NefitEntity(Entity):
         self._remove_callbacks = []
 
         del self._client.events[self._key]
-        del self._client.ui_status_vars[self._key]
+        if self._key in self._client.ui_status_vars:
+            del self._client.ui_status_vars[self._key]
 
     async def async_update(self):
         """Request latest data."""
