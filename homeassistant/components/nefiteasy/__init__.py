@@ -70,8 +70,7 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-# DOMAINS = ["climate", "sensor", "switch"]
-DOMAINS = ["climate", "sensor"]
+DOMAINS = ["climate", "sensor", "switch"]
 
 
 async def async_setup(hass, config):
@@ -177,11 +176,16 @@ class NefitEasy(DataUpdateCoordinator):
 
         self._urls = {}
         self._status_keys = {}
-        for key in config[CONF_SENSORS]:
-            typeconf = SENSOR_TYPES[key]
+        conf = config[CONF_SENSORS] + config[CONF_SWITCHES]
+        for key in conf:
+            if key in SENSOR_TYPES:
+                typeconf = SENSOR_TYPES[key]
+            else:
+                typeconf = SWITCH_TYPES[key]
+
             if url in typeconf:
                 self._urls[typeconf[url]] = {"key": key, short: typeconf.get(short)}
-            else:
+            elif short in typeconf:
                 self._status_keys[typeconf[short]] = key
 
         update_interval = timedelta(seconds=30)

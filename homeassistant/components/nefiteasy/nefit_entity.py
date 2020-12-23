@@ -5,7 +5,7 @@ from typing import Dict
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_NAME, CONF_SERIAL, DOMAIN
+from .const import CONF_NAME, CONF_SERIAL, DOMAIN, url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,3 +46,7 @@ class NefitEntity(CoordinatorEntity):
             "name": self._config[CONF_NAME],
             "manufacturer": "Bosch",
         }
+
+    def get_endpoint(self):
+        """Get end point."""
+        return self._typeconf[url]
