@@ -85,12 +85,12 @@ class NefitThermostat(CoordinatorEntity, ClimateEntity):
     @property
     def current_temperature(self):
         """Return the current temperature."""
-        return self.coordinator.data["inhouse_temperature"]
+        return self.coordinator.data.get("inhouse_temperature")
 
     @property
     def target_temperature(self):
         """Return target temperature."""
-        return self.coordinator.data["temp_setpoint"]
+        return self.coordinator.data.get("temp_setpoint")
 
     @property
     def hvac_modes(self):
@@ -106,7 +106,7 @@ class NefitThermostat(CoordinatorEntity, ClimateEntity):
     def hvac_action(self):
         """Return the current running hvac operation if supported."""
         if (
-            self.coordinator.data["boiler_indicator"] == "CH"
+            self.coordinator.data.get("boiler_indicator") == "CH"
         ):  # HW (hot water) is not for climate
             return CURRENT_HVAC_HEAT
 
@@ -120,9 +120,9 @@ class NefitThermostat(CoordinatorEntity, ClimateEntity):
     @property
     def preset_mode(self):
         """Return the current preset mode."""
-        if self.coordinator.data["user_mode"] == "manual":
+        if self.coordinator.data.get("user_mode") == "manual":
             return OPERATION_MANUAL
-        if self.coordinator.data["user_mode"] == "clock":
+        if self.coordinator.data.get("user_mode") == "clock":
             return OPERATION_CLOCK
 
         return OPERATION_MANUAL
@@ -131,8 +131,8 @@ class NefitThermostat(CoordinatorEntity, ClimateEntity):
     def device_state_attributes(self):
         """Return the device specific state attributes."""
         return {
-            "last_update": self.coordinator.data["last_update"],
-            "boiler_indicator": self.coordinator.data["boiler_indicator"],
+            "last_update": self.coordinator.data.get("last_update"),
+            "boiler_indicator": self.coordinator.data.get("boiler_indicator"),
         }
 
     @property

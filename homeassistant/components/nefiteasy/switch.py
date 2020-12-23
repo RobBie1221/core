@@ -25,7 +25,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             entities.append(NefitSwitchTrueFalse(client, data, key, typeconf))
         elif key == "weather_dependent":
             entities.append(NefitWeatherDependent(client, data, key, typeconf))
-        # elif key == "home_entrance_detection":
+        elif key == "home_entrance_detection":
+            continue
         #    await setup_home_entrance_detection(entities, client, data, key, typeconf)
         else:
             entities.append(NefitSwitch(client, data, key, typeconf))
@@ -57,7 +58,7 @@ class NefitSwitch(NefitEntity, SwitchEntity):
     @property
     def is_on(self):
         """Get whether the switch is in on state."""
-        return self.coordinator.data[self._key] == "on"
+        return self.coordinator.data.get(self._key) == "on"
 
     @property
     def assumed_state(self) -> bool:
@@ -104,7 +105,7 @@ class NefitWeatherDependent(NefitSwitch):
     @property
     def is_on(self):
         """Get whether the switch is in on state."""
-        return self.coordinator.data[self._key] == "weather"
+        return self.coordinator.data.get(self._key) == "weather"
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the entity on."""
@@ -125,7 +126,7 @@ class NefitSwitchTrueFalse(NefitEntity, SwitchEntity):
     @property
     def is_on(self):
         """Get whether the switch is in on state."""
-        return self.coordinator.data[self._key] == "true"
+        return self.coordinator.data.get(self._key) == "true"
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the entity on."""

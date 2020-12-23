@@ -33,7 +33,7 @@ class NefitSensor(NefitEntity):
     @property
     def state(self):
         """Return the state/value of the sensor."""
-        return self.coordinator.data[self._key]
+        return self.coordinator.data.get(self._key)
 
     @property
     def device_class(self):
@@ -58,8 +58,13 @@ class NefitYearTotal(NefitSensor):
     @property
     def state(self):
         """Return the state/value of the sensor."""
+        data = self.coordinator.data.get(self._key)
+
+        if data is None:
+            return None
+
         return "{:.1f}".format(
-            self.coordinator.data[self._key] * 0.12307692
+            data * 0.12307692
         )  # convert kWh to m3, for LPG, multiply with 0.040742416
 
 
@@ -69,7 +74,7 @@ class NefitStatus(NefitSensor):
     @property
     def state(self):
         """Return the state/value of the sensor."""
-        return get_status(self.coordinator.data[self._key])
+        return get_status(self.coordinator.data.get(self._key))
 
 
 def get_status(code):
