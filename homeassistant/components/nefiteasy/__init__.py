@@ -1,6 +1,7 @@
 """Support for first generation Bosch smart home thermostats: Nefit Easy, Junkers CT100 etc."""
 
 import asyncio
+from datetime import timedelta
 import logging
 
 from aionefit import NefitCore
@@ -12,7 +13,7 @@ from homeassistant import config_entries
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     CONF_ACCESSKEY,
@@ -25,7 +26,6 @@ from .const import (
     CONF_SERIAL,
     CONF_SWITCHES,
     CONF_TEMP_STEP,
-    DISPATCHER_ON_DEVICE_UPDATE,
     DOMAIN,
     SENSOR_TYPES,
     STATE_CONNECTED,
@@ -68,7 +68,8 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-DOMAINS = ["climate", "sensor", "switch"]
+# DOMAINS = ["climate", "sensor", "switch"]
+DOMAINS = ["climate"]
 
 
 async def async_setup(hass, config):
@@ -143,17 +144,14 @@ async def async_unload_entry(hass, entry: config_entries.ConfigEntry):
     return True
 
 
-class NefitEasy:
+class NefitEasy(DataUpdateCoordinator):
     """Supporting class for nefit easy."""
 
     def __init__(self, hass, credentials):
         """Initialize nefit easy component."""
         _LOGGER.debug("Initialize Nefit class")
 
-        self.data = {}  # stores device states and values
-        self.keys = {}  # unique name for entity
-        self.events = {}
-        self.ui_status_vars = {}  # variables to monitor for sensors
+        self._data = {}  # stores device states and values
         self.hass = hass
         self.connected_state = STATE_INIT
         self.expected_end = False
@@ -170,6 +168,15 @@ class NefitEasy:
         self.nefit.failed_auth_handler = self.failed_auth_handler
         self.nefit.no_content_callback = self.no_content_callback
         self.nefit.session_end_callback = self.session_end_callback
+
+        update_interval = timedelta(seconds=30)
+
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=update_interval,
+        )
 
     async def connect(self):
         """Connect to nefit easy."""
@@ -303,58 +310,22 @@ class NefitEasy:
 
     async def parse_message(self, data):
         """Message received callback function for the XMPP client."""
-        _LOGGER.debug("parse_message data %s", data)
-        if "id" not in data:
-            _LOGGER.error("Unknown response received: %s", data)
-            return
+        if (
+            data["id"] == "/ecus/rrc/uiStatus"
+            and self.connected_state == STATE_CONNECTION_VERIFIED
+        ):
+            self._data["temp_setpoint"] = float(data["value"]["TSP"])  # for climate
+            self._data["inhouse_temperature"] = float(
+                data["value"]["IHT"]
+            )  # for climate
+            self._data["user_mode"] = data["value"]["UMD"]  # for climate
+            self._data["boiler_indicator"] = data["value"]["BAI"]  # for climate
+            self._data["last_update"] = data["value"]["CTD"]
 
-        if data["id"] in self.keys:
-            key = self.keys[data["id"]]
-            _LOGGER.debug("Got update for %s.", key)
-
-            if (
-                data["id"] == "/ecus/rrc/uiStatus"
-                and self.connected_state == STATE_CONNECTION_VERIFIED
-            ):
-                self.data["temp_setpoint"] = float(data["value"]["TSP"])  # for climate
-                self.data["inhouse_temperature"] = float(
-                    data["value"]["IHT"]
-                )  # for climate
-                self.data["user_mode"] = data["value"]["UMD"]  # for climate
-                self.data["boiler_indicator"] = data["value"]["BAI"]  # for climate
-                self.data["last_update"] = data["value"]["CTD"]
-
-                # Update all sensors/switches when there is new data form uiStatus
-                for uikey in self.ui_status_vars:
-                    self.update_device_value(
-                        uikey, data["value"].get(self.ui_status_vars[uikey])
-                    )
-
-            self.update_device_value(key, data["value"])
-
-            # Mark event as finished if it was part of an update action
-            if key in self.events:
-                self.events[key].set()
-
-    def update_device_value(self, key, value):
-        """Store new device value and send to dispatcher to be picked up by device."""
-        self.data[key] = value
-
-        # send update signal to dispatcher to pick up new state
-        signal = DISPATCHER_ON_DEVICE_UPDATE.format(key=key)
-        async_dispatcher_send(self.hass, signal)
-
-    async def get_value(self, key, url):
-        """Get value."""
-        is_new_key = url not in self.keys
-        if is_new_key:
-            self.events[key] = asyncio.Event()
-            self.keys[url] = key
-        event = self.events[key]
-        event.clear()  # clear old event
+    async def _async_update_data(self):
+        """Update data via library."""
+        url = "/ecus/rrc/uiStatus"
         self.nefit.get(url)
-        await asyncio.wait_for(event.wait(), timeout=9)
-        if is_new_key:
-            del self.events[key]
-            del self.keys[url]
-        return self.data[key]
+        await self.nefit.xmppclient.message_event.wait()
+
+        return self._data
