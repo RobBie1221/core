@@ -13,7 +13,7 @@ from homeassistant import config_entries
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_ACCESSKEY,
@@ -33,6 +33,8 @@ from .const import (
     STATE_ERROR_AUTH,
     STATE_INIT,
     SWITCH_TYPES,
+    short,
+    url,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,7 +71,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 # DOMAINS = ["climate", "sensor", "switch"]
-DOMAINS = ["climate"]
+DOMAINS = ["climate", "sensor"]
 
 
 async def async_setup(hass, config):
@@ -115,6 +117,8 @@ async def async_setup_entry(hass, entry: config_entries.ConfigEntry):
     else:
         raise ConfigEntryNotReady
 
+    await client.async_refresh()
+
     for domain in DOMAINS:
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, domain)
@@ -147,27 +151,38 @@ async def async_unload_entry(hass, entry: config_entries.ConfigEntry):
 class NefitEasy(DataUpdateCoordinator):
     """Supporting class for nefit easy."""
 
-    def __init__(self, hass, credentials):
+    def __init__(self, hass, config):
         """Initialize nefit easy component."""
         _LOGGER.debug("Initialize Nefit class")
 
         self._data = {}  # stores device states and values
+        self._event = asyncio.Event()
         self.hass = hass
         self.connected_state = STATE_INIT
         self.expected_end = False
         self.is_connecting = False
-        self.serial = credentials.get(CONF_SERIAL)
+        self.serial = config[CONF_SERIAL]
+        self._config = config
 
         self.nefit = NefitCore(
-            serial_number=credentials.get(CONF_SERIAL),
-            access_key=credentials.get(CONF_ACCESSKEY),
-            password=credentials.get(CONF_PASSWORD),
+            serial_number=config[CONF_SERIAL],
+            access_key=config[CONF_ACCESSKEY],
+            password=config[CONF_PASSWORD],
             message_callback=self.parse_message,
         )
 
         self.nefit.failed_auth_handler = self.failed_auth_handler
         self.nefit.no_content_callback = self.no_content_callback
         self.nefit.session_end_callback = self.session_end_callback
+
+        self._urls = {}
+        self._status_keys = {}
+        for key in config[CONF_SENSORS]:
+            typeconf = SENSOR_TYPES[key]
+            if url in typeconf:
+                self._urls[typeconf[url]] = {"key": key, short: typeconf.get(short)}
+            else:
+                self._status_keys[typeconf[short]] = key
 
         update_interval = timedelta(seconds=30)
 
@@ -310,6 +325,9 @@ class NefitEasy(DataUpdateCoordinator):
 
     async def parse_message(self, data):
         """Message received callback function for the XMPP client."""
+        # if self.connected_state != STATE_CONNECTION_VERIFIED:
+        #     raise UpdateFailed()
+
         if (
             data["id"] == "/ecus/rrc/uiStatus"
             and self.connected_state == STATE_CONNECTION_VERIFIED
@@ -322,10 +340,32 @@ class NefitEasy(DataUpdateCoordinator):
             self._data["boiler_indicator"] = data["value"]["BAI"]  # for climate
             self._data["last_update"] = data["value"]["CTD"]
 
+            for val, key in self._status_keys.items():
+                self._data[key] = data["value"].get(val)
+        elif (
+            data["id"] in self._urls
+            and self.connected_state == STATE_CONNECTION_VERIFIED
+        ):
+            self._data[self._urls[data["id"]]["key"]] = data["value"]
+
+        self._event.set()
+
     async def _async_update_data(self):
         """Update data via library."""
+        if self.connected_state != STATE_CONNECTION_VERIFIED:
+            raise UpdateFailed("Nefit easy not connected!")
+
+        self._data = {}
+
         url = "/ecus/rrc/uiStatus"
-        self.nefit.get(url)
-        await self.nefit.xmppclient.message_event.wait()
+        await self._async_get_url(url)
+
+        for url in self._urls:
+            await self._async_get_url(url)
 
         return self._data
+
+    async def _async_get_url(self, url):
+        self._event.clear()
+        self.nefit.get(url)
+        await asyncio.wait_for(self._event.wait(), timeout=9)
