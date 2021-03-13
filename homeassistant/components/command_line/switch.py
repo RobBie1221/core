@@ -14,6 +14,7 @@ from homeassistant.const import (
     CONF_COMMAND_STATE,
     CONF_FRIENDLY_NAME,
     CONF_SWITCHES,
+    CONF_UNIQUE_ID,
     CONF_VALUE_TEMPLATE,
 )
 import homeassistant.helpers.config_validation as cv
@@ -32,6 +33,7 @@ SWITCH_SCHEMA = vol.Schema(
         vol.Optional(CONF_FRIENDLY_NAME): cv.string,
         vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_COMMAND_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
+        vol.Optional(CONF_UNIQUE_ID): cv.string,
     }
 )
 
@@ -64,6 +66,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 device_config.get(CONF_COMMAND_STATE),
                 value_template,
                 device_config[CONF_COMMAND_TIMEOUT],
+                device_config.get(CONF_UNIQUE_ID),
             )
         )
 
@@ -87,6 +90,7 @@ class CommandSwitch(SwitchEntity):
         command_state,
         value_template,
         timeout,
+        unique_id,
     ):
         """Initialize the switch."""
         self._hass = hass
@@ -98,6 +102,7 @@ class CommandSwitch(SwitchEntity):
         self._command_state = command_state
         self._value_template = value_template
         self._timeout = timeout
+        self._unique_id = unique_id
 
     def _switch(self, command):
         """Execute the actual commands."""
@@ -167,3 +172,8 @@ class CommandSwitch(SwitchEntity):
         if self._switch(self._command_off) and not self._command_state:
             self._state = False
             self.schedule_update_ha_state()
+
+    @property
+    def unique_id(self):
+        """Return the unique id of this thermostat."""
+        return self._unique_id
