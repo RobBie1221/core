@@ -36,6 +36,7 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
     EVENT_HOMEASSISTANT_STOP,
     EVENT_STATE_CHANGED,
+    EVENT_STATE_REPORTED,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
@@ -48,6 +49,7 @@ from homeassistant.helpers.entityfilter import (
     convert_include_exclude_filter,
 )
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util.async_ import run_callback_threadsafe
 
 from .const import (
     API_VERSION_2,
@@ -491,9 +493,12 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
         return True
 
+    entity_filter = convert_include_exclude_filter(conf)
     event_to_json = _generate_event_to_json(conf)
     max_tries = conf.get(CONF_RETRY_COUNT)
-    instance = hass.data[DOMAIN] = InfluxThread(hass, influx, event_to_json, max_tries)
+    instance = hass.data[DOMAIN] = InfluxThread(
+        hass, influx, event_to_json, max_tries, entity_filter
+    )
     instance.start()
 
     def shutdown(event):
@@ -510,18 +515,33 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 class InfluxThread(threading.Thread):
     """A threaded event handler class."""
 
-    def __init__(self, hass, influx, event_to_json, max_tries):
+    def __init__(self, hass, influx, event_to_json, max_tries, entity_filter):
         """Initialize the listener."""
         threading.Thread.__init__(self, name=DOMAIN)
         self.queue: queue.SimpleQueue[threading.Event | tuple[float, Event] | None] = (
             queue.SimpleQueue()
         )
         self.influx = influx
+        self.entity_filter = entity_filter
         self.event_to_json = event_to_json
         self.max_tries = max_tries
         self.write_errors = 0
         self.shutdown = False
         hass.bus.listen(EVENT_STATE_CHANGED, self._event_listener)
+        run_callback_threadsafe(
+            hass.loop,
+            hass.bus.async_listen,
+            EVENT_STATE_REPORTED,
+            self._event_listener,
+            self._event_entity_filter,
+        )
+
+    @callback
+    def _event_entity_filter(self, data) -> bool:
+        entity_id = data.get("entity_id")
+        if entity_id is not None:
+            return self.entity_filter(entity_id)
+        return False
 
     @callback
     def _event_listener(self, event):
