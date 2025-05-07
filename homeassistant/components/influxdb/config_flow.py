@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import (
     CONF_HOST,
@@ -55,6 +57,44 @@ class InfluxDBConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for InfluxDB."""
 
     VERSION = 1
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step when user initializes a integration."""
+        if user_input is not None:
+            api_version = user_input[CONF_API_VERSION]
+            if api_version == "1.x":
+                return await self.async_step_configure_v1()
+
+            return await self.async_step_configure_v2()
+
+        list_of_types = ["1.x", "2.x"]
+
+        schema = vol.Schema(
+            {vol.Required(CONF_API_VERSION, default="2.x"): vol.In(list_of_types)}
+        )
+        return self.async_show_form(step_id="user", data_schema=schema)
+
+    async def async_step_configure_v1(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step when user configures InfluxDB v1."""
+        list_of_types = ["1.x", "2.x"]
+        schema = vol.Schema(
+            {vol.Required(CONF_API_VERSION, default="2.x"): vol.In(list_of_types)}
+        )
+        return self.async_show_form(step_id="user", data_schema=schema)
+
+    async def async_step_configure_v2(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step when user configures InfluxDB v2."""
+        list_of_types = ["1.x", "2.x"]
+        schema = vol.Schema(
+            {vol.Required(CONF_API_VERSION, default="2.x"): vol.In(list_of_types)}
+        )
+        return self.async_show_form(step_id="user", data_schema=schema)
 
     async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
         """Handle the initial step."""
